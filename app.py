@@ -251,8 +251,6 @@ def _pct_cell(val, is_selected: bool) -> str:
 
 def render_ranking_table(df: pd.DataFrame, sort_col: str) -> None:
     """業種ランキングテーブルを HTML で描画する。"""
-    from urllib.parse import quote
-
     df = df.copy()
     df["_sort"] = df[sort_col].apply(lambda x: x if pd.notna(x) else -9999.0)
     df = (
@@ -264,7 +262,7 @@ def render_ranking_table(df: pd.DataFrame, sort_col: str) -> None:
     period_cols = list(PERIODS.keys())
     th = "padding:6px 8px;white-space:nowrap;"
 
-    # ヘッダー行（期間列はクリックでソート切替）
+    # ヘッダー行（選択中の列を強調表示）
     header_cells = (
         f'<th style="{th}text-align:center;width:3em">順位</th>'
         f'<th style="{th}text-align:left">業種名</th>'
@@ -275,11 +273,7 @@ def render_ranking_table(df: pd.DataFrame, sort_col: str) -> None:
             sel_style = "font-weight:bold;border-bottom:3px solid #e63329;color:#e63329;"
             header_cells += f'<th style="{th}text-align:right;{sel_style}">{p}</th>'
         else:
-            header_cells += (
-                f'<th style="{th}text-align:right;">'
-                f'<a href="?sort={quote(p)}" target="_top" style="color:inherit;text-decoration:none;cursor:pointer;">{p}</a>'
-                f'</th>'
-            )
+            header_cells += f'<th style="{th}text-align:right;">{p}</th>'
 
     # データ行
     rows_html = []
@@ -314,6 +308,19 @@ def render_ranking_table(df: pd.DataFrame, sort_col: str) -> None:
     st.markdown(table_html, unsafe_allow_html=True)
 
 
+@st.fragment
+def show_ranking_section(rankings: pd.DataFrame) -> None:
+    """期間選択 + ランキングテーブルをフラグメントとして描画する（期間切替時にここだけ再実行）。"""
+    period_keys = list(PERIODS.keys())
+    selected_period = st.segmented_control(
+        "ソート期間",
+        options=period_keys,
+        default=period_keys[0],
+        label_visibility="collapsed",
+    )
+    render_ranking_table(rankings, selected_period or period_keys[0])
+
+
 # ── メイン ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -338,13 +345,8 @@ def main() -> None:
         st.warning("銘柄データが読み込めませんでした。CSVファイルを確認してください。")
         return
 
-    # ソート列を URL パラメータから取得（テーブルヘッダークリックで切替）
     today = datetime.today().strftime("%Y-%m-%d")
-    selected_period = st.query_params.get("sort", "1日")
-    if selected_period not in PERIODS:
-        selected_period = "1日"
-
-    st.caption(f"対象: プライム市場 {len(stocks_df):,}社 ｜ ソート: {selected_period} ｜ 更新: {today}（日次キャッシュ）")
+    st.caption(f"対象: プライム市場 {len(stocks_df):,}社 ｜ 更新: {today}（日次キャッシュ）")
 
     tickers = tuple(stocks_df["ticker"].tolist())
 
@@ -371,8 +373,8 @@ def main() -> None:
         st.warning("ランキングデータを計算できませんでした。")
         return
 
-    # ランキング表示
-    render_ranking_table(rankings, selected_period)
+    # ランキング表示（フラグメント：期間切替時にここだけ再実行）
+    show_ranking_section(rankings)
 
     st.markdown("---")
     st.caption(
