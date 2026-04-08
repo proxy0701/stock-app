@@ -18,7 +18,7 @@ TSE_33_SECTORS = [
     "鉄鋼", "非鉄金属", "金属製品", "機械", "電気機器", "輸送用機器",
     "精密機器", "その他製品", "電気・ガス業", "陸運業", "海運業", "空運業",
     "倉庫・運輸関連業", "情報・通信業", "卸売業", "小売業", "銀行業",
-    "証券・商品先物取引業", "保険業", "その他金融業", "不動産業", "サービス業",
+    "証券、商品先物取引業", "保険業", "その他金融業", "不動産業", "サービス業",
 ]
 
 
@@ -251,6 +251,8 @@ def _pct_cell(val, is_selected: bool) -> str:
 
 def render_ranking_table(df: pd.DataFrame, sort_col: str) -> None:
     """業種ランキングテーブルを HTML で描画する。"""
+    from urllib.parse import quote
+
     df = df.copy()
     df["_sort"] = df[sort_col].apply(lambda x: x if pd.notna(x) else -9999.0)
     df = (
@@ -262,15 +264,22 @@ def render_ranking_table(df: pd.DataFrame, sort_col: str) -> None:
     period_cols = list(PERIODS.keys())
     th = "padding:6px 8px;white-space:nowrap;"
 
-    # ヘッダー行
+    # ヘッダー行（期間列はクリックでソート切替）
     header_cells = (
         f'<th style="{th}text-align:center;width:3em">順位</th>'
         f'<th style="{th}text-align:left">業種名</th>'
         f'<th style="{th}text-align:right">銘柄数</th>'
     )
     for p in period_cols:
-        sel_style = "font-weight:bold;border-bottom:3px solid #e63329;" if p == sort_col else ""
-        header_cells += f'<th style="{th}text-align:right;{sel_style}">{p}</th>'
+        if p == sort_col:
+            sel_style = "font-weight:bold;border-bottom:3px solid #e63329;color:#e63329;"
+            header_cells += f'<th style="{th}text-align:right;{sel_style}">{p}</th>'
+        else:
+            header_cells += (
+                f'<th style="{th}text-align:right;">'
+                f'<a href="?sort={quote(p)}" target="_top" style="color:inherit;text-decoration:none;cursor:pointer;">{p}</a>'
+                f'</th>'
+            )
 
     # データ行
     rows_html = []
@@ -329,13 +338,13 @@ def main() -> None:
         st.warning("銘柄データが読み込めませんでした。CSVファイルを確認してください。")
         return
 
-    # 期間選択 UI
-    col_sel, col_info = st.columns([2, 4])
-    with col_sel:
-        selected_period = st.selectbox("表示期間", list(PERIODS.keys()), index=0)
-    with col_info:
-        today = datetime.today().strftime("%Y-%m-%d")
-        st.caption(f"対象: プライム市場 {len(stocks_df):,}社 ｜ 更新: {today}（日次キャッシュ）")
+    # ソート列を URL パラメータから取得（テーブルヘッダークリックで切替）
+    today = datetime.today().strftime("%Y-%m-%d")
+    selected_period = st.query_params.get("sort", "1日")
+    if selected_period not in PERIODS:
+        selected_period = "1日"
+
+    st.caption(f"対象: プライム市場 {len(stocks_df):,}社 ｜ ソート: {selected_period} ｜ 更新: {today}（日次キャッシュ）")
 
     tickers = tuple(stocks_df["ticker"].tolist())
 
