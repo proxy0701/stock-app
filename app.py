@@ -223,6 +223,52 @@ def compute_sector_rankings(prices_df: pd.DataFrame, stocks_df: pd.DataFrame) ->
     return pd.DataFrame(rows)
 
 
+def compute_stock_rankings(sector: str, prices_df: pd.DataFrame, stocks_df: pd.DataFrame) -> pd.DataFrame:
+    """指定業種に含まれる全銘柄の騰落率（全期間）を個別に計算する。"""
+    group = stocks_df[stocks_df["33業種区分"] == sector]
+    if group.empty:
+        return pd.DataFrame()
+
+    rows = []
+    for _, stock in group.iterrows():
+        ticker = stock["ticker"]
+        if ticker not in prices_df.columns:
+            continue
+
+        series = prices_df[ticker].dropna()
+        if series.empty:
+            continue
+
+        last_date = series.index[-1]
+        last_close = series.iloc[-1]
+        date_str = f"{last_date.month}/{last_date.day}"
+
+        # 全データ（dropna前）のインデックスでの位置を取得
+        full_series = prices_df[ticker]
+        last_pos = full_series.index.get_loc(last_date)
+
+        period_results = {}
+        for period_name, n_days in PERIODS.items():
+            past_pos = last_pos - n_days
+            if past_pos < 0:
+                period_results[period_name] = np.nan
+                continue
+            past_close = full_series.iloc[past_pos]
+            if pd.isna(past_close) or past_close <= 0:
+                period_results[period_name] = np.nan
+                continue
+            period_results[period_name] = float((last_close - past_close) / past_close * 100)
+
+        rows.append({
+            "コード": stock["コード"],
+            "銘柄名": stock["銘柄名"],
+            "日付": date_str,
+            **period_results,
+        })
+
+    return pd.DataFrame(rows)
+
+
 # ── テーブル描画 ────────────────────────────────────────────────────────────────
 
 def _pct_cell(val, is_selected: bool) -> str:
@@ -284,7 +330,7 @@ def render_ranking_table(df: pd.DataFrame, sort_col: str) -> None:
 
         cells = (
             f'<td style="{td}text-align:center;color:#999;font-size:0.85em">{rank}</td>'
-            f'<td style="{td}white-space:nowrap">{row["業種"]}</td>'
+            f'<td style="{td}white-space:nowrap"><a href="?sector={row["業種"]}" target="_self" style="color:inherit;text-decoration:none;border-bottom:1px dashed #aaa">{row["業種"]}</a></td>'
             f'<td style="{td}text-align:right;color:#aaa;font-size:0.8em">'
             f'{int(row["銘柄数"])}社</td>'
         )
@@ -294,7 +340,65 @@ def render_ranking_table(df: pd.DataFrame, sort_col: str) -> None:
         rows_html.append(f'<tr style="background:{bg}">{cells}</tr>')
 
     table_html = f"""
-<div style="overflow-x:auto;margin-top:0.5rem">
+<div class="fade-in" style="overflow-x:auto;margin-top:0.5rem">
+<table style="width:100%;border-collapse:collapse;font-size:0.88rem">
+  <thead>
+    <tr style="border-bottom:2px solid #ddd">{header_cells}</tr>
+  </thead>
+  <tbody>
+    {"".join(rows_html)}
+  </tbody>
+</table>
+</div>
+"""
+    st.markdown(table_html, unsafe_allow_html=True)
+
+
+def render_stock_table(df: pd.DataFrame, sort_col: str) -> None:
+    """銘柄ランキングテーブルを HTML で描画する。"""
+    df = df.copy()
+    df["_sort"] = df[sort_col].apply(lambda x: x if pd.notna(x) else -9999.0)
+    df = (
+        df.sort_values("_sort", ascending=False)
+        .drop(columns="_sort")
+        .reset_index(drop=True)
+    )
+
+    period_cols = list(PERIODS.keys())
+    th = "padding:6px 8px;white-space:nowrap;"
+
+    # ヘッダー行
+    header_cells = (
+        f'<th style="{th}text-align:center;width:3em">順位</th>'
+        f'<th style="{th}text-align:left">銘柄名</th>'
+        f'<th style="{th}text-align:right;color:#aaa;font-size:0.85em">日付</th>'
+    )
+    for p in period_cols:
+        if p == sort_col:
+            sel_style = "font-weight:bold;border-bottom:3px solid #e63329;color:#e63329;"
+            header_cells += f'<th style="{th}text-align:right;{sel_style}">{p}</th>'
+        else:
+            header_cells += f'<th style="{th}text-align:right;">{p}</th>'
+
+    # データ行
+    rows_html = []
+    for i, row in df.iterrows():
+        rank = i + 1
+        bg = "#fafafa" if rank % 2 == 0 else "#ffffff"
+        td = "padding:6px 8px;"
+
+        cells = (
+            f'<td style="{td}text-align:center;color:#999;font-size:0.85em">{rank}</td>'
+            f'<td style="{td}white-space:nowrap">{row["銘柄名"]}</td>'
+            f'<td style="{td}text-align:right;color:#aaa;font-size:0.8em">{row["日付"]}</td>'
+        )
+        for p in period_cols:
+            cells += _pct_cell(row[p], is_selected=(p == sort_col))
+
+        rows_html.append(f'<tr style="background:{bg}">{cells}</tr>')
+
+    table_html = f"""
+<div class="fade-in" style="overflow-x:auto;margin-top:0.5rem">
 <table style="width:100%;border-collapse:collapse;font-size:0.88rem">
   <thead>
     <tr style="border-bottom:2px solid #ddd">{header_cells}</tr>
@@ -321,6 +425,31 @@ def show_ranking_section(rankings: pd.DataFrame) -> None:
     render_ranking_table(rankings, selected_period or period_keys[0])
 
 
+@st.fragment
+def show_stock_section(sector: str, prices_df: pd.DataFrame, stocks_df: pd.DataFrame) -> None:
+    """銘柄ランキングセクションをフラグメントとして描画する（期間切替時にここだけ再実行）。"""
+    st.markdown(
+        '<a href="?" target="_self" style="font-size:0.9rem;color:#555;text-decoration:none">'
+        '← 業種一覧に戻る</a>',
+        unsafe_allow_html=True,
+    )
+    st.subheader(f"📋 {sector} — 銘柄別パフォーマンス")
+
+    stock_rankings = compute_stock_rankings(sector, prices_df, stocks_df)
+    if stock_rankings.empty:
+        st.warning("この業種に該当する銘柄の価格データがありません。")
+        return
+
+    period_keys = list(PERIODS.keys())
+    selected_period = st.segmented_control(
+        "ソート期間",
+        options=period_keys,
+        default=period_keys[0],
+        label_visibility="collapsed",
+    )
+    render_stock_table(stock_rankings, selected_period or period_keys[0])
+
+
 # ── メイン ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -331,7 +460,11 @@ def main() -> None:
     )
 
     st.markdown(
-        "<style>.block-container{padding-top:1.2rem;padding-bottom:1rem}</style>",
+        """<style>
+.block-container{padding-top:1.2rem;padding-bottom:1rem}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn 0.3s ease-out}
+</style>""",
         unsafe_allow_html=True,
     )
 
@@ -374,7 +507,11 @@ def main() -> None:
         return
 
     # ランキング表示（フラグメント：期間切替時にここだけ再実行）
-    show_ranking_section(rankings)
+    sector = st.query_params.get("sector")
+    if sector and sector in TSE_33_SECTORS:
+        show_stock_section(sector, prices_df, stocks_df)
+    else:
+        show_ranking_section(rankings)
 
     st.markdown("---")
     st.caption(
