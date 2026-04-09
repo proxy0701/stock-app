@@ -306,6 +306,7 @@ def render_ranking_table(df: pd.DataFrame, sort_col: str) -> None:
     )
 
     period_cols = list(PERIODS.keys())
+    period_cols = [sort_col] + [p for p in period_cols if p != sort_col]
     th = "padding:6px 8px;white-space:nowrap;"
 
     # ヘッダー行（選択中の列を強調表示）
@@ -365,6 +366,7 @@ def render_stock_table(df: pd.DataFrame, sort_col: str) -> None:
     )
 
     period_cols = list(PERIODS.keys())
+    period_cols = [sort_col] + [p for p in period_cols if p != sort_col]
     th = "padding:6px 8px;white-space:nowrap;"
 
     # ヘッダー行
@@ -464,6 +466,7 @@ def main() -> None:
 .block-container{padding-top:1.2rem;padding-bottom:1rem}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .fade-in{animation:fadeIn 0.3s ease-out}
+html,body,[data-testid="stAppViewContainer"],.main{background-color:#ffffff !important}
 </style>""",
         unsafe_allow_html=True,
     )
