@@ -351,18 +351,18 @@ def render_ranking_table(df: pd.DataFrame, sort_col: str) -> None:
         rows_html.append(f'<tr class="hover">{cells}</tr>')
 
     table_html = f"""
-<div data-theme="corporate" class="fade-in" style="margin-top:0.5rem;overflow-x:auto">
-  <div style="border-radius:0.75rem;overflow:hidden;border:1px solid #e5e7eb;
-              box-shadow:0 1px 4px rgba(0,0,0,0.06)">
-    <table class="table table-zebra table-sm" style="width:100%;font-size:0.88rem">
-      <thead style="background:#f8fafc">
-        <tr>{header_cells}</tr>
-      </thead>
-      <tbody>
-        {"".join(rows_html)}
-      </tbody>
-    </table>
-  </div>
+<div data-theme="corporate" class="fade-in"
+     style="margin-top:0.5rem;overflow-x:auto;-webkit-overflow-scrolling:touch;
+            border-radius:0.75rem;border:1px solid #e5e7eb;
+            box-shadow:0 1px 4px rgba(0,0,0,0.06)">
+  <table class="table table-zebra table-sm" style="min-width:600px;font-size:0.88rem">
+    <thead style="background:#f8fafc">
+      <tr>{header_cells}</tr>
+    </thead>
+    <tbody>
+      {"".join(rows_html)}
+    </tbody>
+  </table>
 </div>
 """
     st.markdown(table_html, unsafe_allow_html=True)
@@ -414,18 +414,18 @@ def render_stock_table(df: pd.DataFrame, sort_col: str) -> None:
         rows_html.append(f'<tr class="hover">{cells}</tr>')
 
     table_html = f"""
-<div data-theme="corporate" class="fade-in" style="margin-top:0.5rem;overflow-x:auto">
-  <div style="border-radius:0.75rem;overflow:hidden;border:1px solid #e5e7eb;
-              box-shadow:0 1px 4px rgba(0,0,0,0.06)">
-    <table class="table table-zebra table-sm" style="width:100%;font-size:0.88rem">
-      <thead style="background:#f8fafc">
-        <tr>{header_cells}</tr>
-      </thead>
-      <tbody>
-        {"".join(rows_html)}
-      </tbody>
-    </table>
-  </div>
+<div data-theme="corporate" class="fade-in"
+     style="margin-top:0.5rem;overflow-x:auto;-webkit-overflow-scrolling:touch;
+            border-radius:0.75rem;border:1px solid #e5e7eb;
+            box-shadow:0 1px 4px rgba(0,0,0,0.06)">
+  <table class="table table-zebra table-sm" style="min-width:600px;font-size:0.88rem">
+    <thead style="background:#f8fafc">
+      <tr>{header_cells}</tr>
+    </thead>
+    <tbody>
+      {"".join(rows_html)}
+    </tbody>
+  </table>
 </div>
 """
     st.markdown(table_html, unsafe_allow_html=True)
