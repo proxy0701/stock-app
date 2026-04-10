@@ -152,6 +152,12 @@ def fetch_all_prices(tickers: tuple) -> pd.DataFrame:
     all_prices = pd.concat(results, axis=1)
     # 列名の重複を除去
     all_prices = all_prices.loc[:, ~all_prices.columns.duplicated()]
+    # 有効データが全銘柄の過半数未満の末尾行を除去
+    # （yfinanceの日本株データ遅延で最終行がほぼNaNになるケースへの対策）
+    valid_ratio = all_prices.notna().mean(axis=1)
+    last_valid_idx = valid_ratio[valid_ratio >= 0.5].last_valid_index()
+    if last_valid_idx is not None:
+        all_prices = all_prices.loc[:last_valid_idx]
     return all_prices
 
 
