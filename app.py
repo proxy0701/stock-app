@@ -280,25 +280,33 @@ def compute_stock_rankings(sector: str, prices_df: pd.DataFrame, stocks_df: pd.D
 def _pct_cell(val, is_selected: bool) -> str:
     """騰落率の HTML セルを生成する（日本式: 上昇=赤、下落=青）。"""
     if val is None or (isinstance(val, float) and np.isnan(val)):
-        return '<td style="text-align:right;color:#bbb;padding:6px 8px">--</td>'
+        return (
+            '<td style="text-align:right;padding:4px 10px">'
+            '<span class="badge badge-ghost badge-sm" style="opacity:0.35;font-family:monospace">--</span>'
+            '</td>'
+        )
 
     if val > 0:
-        color = "#e63329"
+        bg = "#fee2e2"
+        color = "#c0392b"
         text = f"+{val:.2f}%"
     elif val < 0:
-        color = "#1a73e8"
+        bg = "#dbeafe"
+        color = "#1a56db"
         text = f"{val:.2f}%"
     else:
-        color = "#888"
+        bg = "#f3f4f6"
+        color = "#6b7280"
         text = f"{val:.2f}%"
 
-    style = f"text-align:right;color:{color};padding:6px 8px;"
-    if is_selected:
-        style += "font-weight:bold;"
-        bg = "#fff3f3" if val > 0 else ("#f0f4ff" if val < 0 else "#f8f8f8")
-        style += f"background:{bg};"
-
-    return f'<td style="{style}">{text}</td>'
+    weight = "font-weight:700;" if is_selected else "font-weight:500;"
+    border = f"outline:2px solid {color};outline-offset:-1px;" if is_selected else ""
+    return (
+        f'<td style="text-align:right;padding:4px 10px">'
+        f'<span class="badge badge-sm" style="background:{bg};color:{color};{weight}{border}'
+        f'font-family:monospace;font-size:0.78rem;letter-spacing:0.02em">{text}</span>'
+        f'</td>'
+    )
 
 
 def render_ranking_table(df: pd.DataFrame, sort_col: str) -> None:
@@ -313,49 +321,56 @@ def render_ranking_table(df: pd.DataFrame, sort_col: str) -> None:
 
     period_cols = list(PERIODS.keys())
     period_cols = [sort_col] + [p for p in period_cols if p != sort_col]
-    th = "padding:6px 8px;white-space:nowrap;"
+    th = "padding:8px 10px;white-space:nowrap;font-size:0.8rem;font-weight:600;color:#374151;"
 
     # ヘッダー行（選択中の列を強調表示）
     header_cells = (
-        f'<th style="{th}text-align:center;width:3em">順位</th>'
+        f'<th style="{th}text-align:center;width:2.8em">順位</th>'
         f'<th style="{th}text-align:left">業種名</th>'
         f'<th style="{th}text-align:right">銘柄数</th>'
     )
     for p in period_cols:
         if p == sort_col:
-            sel_style = "font-weight:bold;border-bottom:3px solid #e63329;color:#e63329;"
-            header_cells += f'<th style="{th}text-align:right;{sel_style}">{p}</th>'
+            header_cells += (
+                f'<th style="{th}text-align:right;color:#1d4ed8;'
+                f'border-bottom:2px solid #1d4ed8">{p} ▼</th>'
+            )
         else:
-            header_cells += f'<th style="{th}text-align:right;">{p}</th>'
+            header_cells += f'<th style="{th}text-align:right">{p}</th>'
 
     # データ行
     rows_html = []
     for i, row in df.iterrows():
         rank = i + 1
-        bg = "#fafafa" if rank % 2 == 0 else "#ffffff"
-        td = "padding:6px 8px;"
+        td = "padding:6px 10px;"
 
         cells = (
-            f'<td style="{td}text-align:center;color:#999;font-size:0.85em">{rank}</td>'
-            f'<td style="{td}white-space:nowrap"><a href="?sector={row["業種"]}" target="_self" style="color:inherit;text-decoration:none;border-bottom:1px dashed #aaa">{row["業種"]}</a></td>'
-            f'<td style="{td}text-align:right;color:#aaa;font-size:0.8em">'
+            f'<td style="{td}text-align:center;color:#9ca3af;font-size:0.82rem">{rank}</td>'
+            f'<td style="{td}white-space:nowrap;font-weight:500">'
+            f'<a href="?sector={row["業種"]}" target="_self" '
+            f'style="color:#1e40af;text-decoration:none">'
+            f'{row["業種"]}</a></td>'
+            f'<td style="{td}text-align:right;font-size:0.78rem;color:#9ca3af">'
             f'{int(row["銘柄数"])}社</td>'
         )
         for p in period_cols:
             cells += _pct_cell(row[p], is_selected=(p == sort_col))
 
-        rows_html.append(f'<tr style="background:{bg}">{cells}</tr>')
+        rows_html.append(f'<tr class="hover">{cells}</tr>')
 
     table_html = f"""
-<div class="fade-in" style="overflow-x:auto;margin-top:0.5rem">
-<table style="width:100%;border-collapse:collapse;font-size:0.88rem">
-  <thead>
-    <tr style="border-bottom:2px solid #ddd">{header_cells}</tr>
-  </thead>
-  <tbody>
-    {"".join(rows_html)}
-  </tbody>
-</table>
+<div data-theme="corporate" class="fade-in" style="margin-top:0.5rem;overflow-x:auto">
+  <div style="border-radius:0.75rem;overflow:hidden;border:1px solid #e5e7eb;
+              box-shadow:0 1px 4px rgba(0,0,0,0.06)">
+    <table class="table table-zebra table-sm" style="width:100%;font-size:0.88rem">
+      <thead style="background:#f8fafc">
+        <tr>{header_cells}</tr>
+      </thead>
+      <tbody>
+        {"".join(rows_html)}
+      </tbody>
+    </table>
+  </div>
 </div>
 """
     st.markdown(table_html, unsafe_allow_html=True)
@@ -373,48 +388,52 @@ def render_stock_table(df: pd.DataFrame, sort_col: str) -> None:
 
     period_cols = list(PERIODS.keys())
     period_cols = [sort_col] + [p for p in period_cols if p != sort_col]
-    th = "padding:6px 8px;white-space:nowrap;"
+    th = "padding:8px 10px;white-space:nowrap;font-size:0.8rem;font-weight:600;color:#374151;"
 
     # ヘッダー行
     header_cells = (
-        f'<th style="{th}text-align:center;width:3em">順位</th>'
+        f'<th style="{th}text-align:center;width:2.8em">順位</th>'
         f'<th style="{th}text-align:left">銘柄名</th>'
-        f'<th style="{th}text-align:right;color:#aaa;font-size:0.85em">日付</th>'
+        f'<th style="{th}text-align:right;color:#9ca3af">日付</th>'
     )
     for p in period_cols:
         if p == sort_col:
-            sel_style = "font-weight:bold;border-bottom:3px solid #e63329;color:#e63329;"
-            header_cells += f'<th style="{th}text-align:right;{sel_style}">{p}</th>'
+            header_cells += (
+                f'<th style="{th}text-align:right;color:#1d4ed8;'
+                f'border-bottom:2px solid #1d4ed8">{p} ▼</th>'
+            )
         else:
-            header_cells += f'<th style="{th}text-align:right;">{p}</th>'
+            header_cells += f'<th style="{th}text-align:right">{p}</th>'
 
     # データ行
     rows_html = []
     for i, row in df.iterrows():
         rank = i + 1
-        bg = "#fafafa" if rank % 2 == 0 else "#ffffff"
-        td = "padding:6px 8px;"
+        td = "padding:6px 10px;"
 
         cells = (
-            f'<td style="{td}text-align:center;color:#999;font-size:0.85em">{rank}</td>'
-            f'<td style="{td}white-space:nowrap">{row["銘柄名"]}</td>'
-            f'<td style="{td}text-align:right;color:#aaa;font-size:0.8em">{row["日付"]}</td>'
+            f'<td style="{td}text-align:center;color:#9ca3af;font-size:0.82rem">{rank}</td>'
+            f'<td style="{td}white-space:nowrap;font-weight:500">{row["銘柄名"]}</td>'
+            f'<td style="{td}text-align:right;font-size:0.78rem;color:#9ca3af">{row["日付"]}</td>'
         )
         for p in period_cols:
             cells += _pct_cell(row[p], is_selected=(p == sort_col))
 
-        rows_html.append(f'<tr style="background:{bg}">{cells}</tr>')
+        rows_html.append(f'<tr class="hover">{cells}</tr>')
 
     table_html = f"""
-<div class="fade-in" style="overflow-x:auto;margin-top:0.5rem">
-<table style="width:100%;border-collapse:collapse;font-size:0.88rem">
-  <thead>
-    <tr style="border-bottom:2px solid #ddd">{header_cells}</tr>
-  </thead>
-  <tbody>
-    {"".join(rows_html)}
-  </tbody>
-</table>
+<div data-theme="corporate" class="fade-in" style="margin-top:0.5rem;overflow-x:auto">
+  <div style="border-radius:0.75rem;overflow:hidden;border:1px solid #e5e7eb;
+              box-shadow:0 1px 4px rgba(0,0,0,0.06)">
+    <table class="table table-zebra table-sm" style="width:100%;font-size:0.88rem">
+      <thead style="background:#f8fafc">
+        <tr>{header_cells}</tr>
+      </thead>
+      <tbody>
+        {"".join(rows_html)}
+      </tbody>
+    </table>
+  </div>
 </div>
 """
     st.markdown(table_html, unsafe_allow_html=True)
@@ -437,7 +456,10 @@ def show_ranking_section(rankings: pd.DataFrame) -> None:
 def show_stock_section(sector: str, prices_df: pd.DataFrame, stocks_df: pd.DataFrame) -> None:
     """銘柄ランキングセクションをフラグメントとして描画する（期間切替時にここだけ再実行）。"""
     st.markdown(
-        '<a href="?" target="_self" style="font-size:0.9rem;color:#555;text-decoration:none">'
+        '<a href="?" target="_self" class="badge badge-ghost badge-md" '
+        'data-theme="corporate" '
+        'style="font-size:0.82rem;text-decoration:none;border:1px solid #d1d5db;'
+        'color:#374151;padding:0.4rem 0.8rem;border-radius:0.5rem;display:inline-block">'
         '← 業種一覧に戻る</a>',
         unsafe_allow_html=True,
     )
@@ -468,16 +490,29 @@ def main() -> None:
     )
 
     st.markdown(
-        """<style>
-.block-container{padding-top:1.2rem;padding-bottom:1rem}
-@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-.fade-in{animation:fadeIn 0.3s ease-out}
-html,body,[data-testid="stAppViewContainer"],.main{background-color:#ffffff !important}
-</style>""",
+        """
+<link href="https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css" rel="stylesheet" type="text/css" />
+<style>
+.block-container{padding-top:1.5rem;padding-bottom:1rem}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn 0.35s ease-out}
+html,body,[data-testid="stAppViewContainer"],.main{background-color:#f5f7fa !important}
+/* Streamlitデフォルトタイトルを非表示にして独自ヘッダーを使う */
+[data-testid="stAppViewContainer"] > section > div > div:first-child h1{display:none}
+</style>
+<div data-theme="corporate" class="fade-in"
+     style="background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 100%);
+            border-radius:1rem;padding:1.25rem 1.5rem;color:#fff;margin-bottom:0.25rem">
+  <div style="font-size:1.4rem;font-weight:700;letter-spacing:-0.3px">
+    📊 東証プライム 33業種パフォーマンス
+  </div>
+  <div style="font-size:0.82rem;opacity:0.8;margin-top:0.3rem">
+    プライム市場 全33業種の騰落率ランキング（時価総額加重平均）
+  </div>
+</div>
+""",
         unsafe_allow_html=True,
     )
-
-    st.title("📊 東証プライム 33業種パフォーマンス")
 
     # 銘柄一覧の読み込み
     with st.spinner("銘柄一覧を読み込み中..."):
@@ -488,7 +523,12 @@ html,body,[data-testid="stAppViewContainer"],.main{background-color:#ffffff !imp
         return
 
     today = datetime.today().strftime("%Y-%m-%d")
-    st.caption(f"対象: プライム市場 {len(stocks_df):,}社 ｜ 更新: {today}（日次キャッシュ）")
+    st.markdown(
+        f'<div data-theme="corporate" style="margin:0.4rem 0 0.8rem;font-size:0.78rem;color:#6b7280">'
+        f'対象: プライム市場 <strong>{len(stocks_df):,}社</strong>'
+        f' &nbsp;|&nbsp; 更新: {today}（日次キャッシュ）</div>',
+        unsafe_allow_html=True,
+    )
 
     tickers = tuple(stocks_df["ticker"].tolist())
 
@@ -522,12 +562,16 @@ html,body,[data-testid="stAppViewContainer"],.main{background-color:#ffffff !imp
     else:
         show_ranking_section(rankings)
 
-    st.markdown("---")
-    st.caption(
-        "※ 時価総額加重平均方式（最新株価 × 発行済株式数）で計算。"
-        "発行済株式数はyfinanceから自動取得（日次更新）。"
-        "騰落率は最新取得終値ベース（前営業日終値）。"
-        "一部銘柄はデータ取得できない場合があります。"
+    st.markdown(
+        '<div data-theme="corporate" style="margin-top:1.5rem;padding:0.75rem 1rem;'
+        'background:#f8fafc;border-radius:0.5rem;border:1px solid #e5e7eb;'
+        'font-size:0.75rem;color:#9ca3af;line-height:1.6">'
+        '※ 時価総額加重平均方式（最新株価 × 発行済株式数）で計算。'
+        '発行済株式数はyfinanceから自動取得（日次更新）。'
+        '騰落率は最新取得終値ベース（前営業日終値）。'
+        '一部銘柄はデータ取得できない場合があります。'
+        '</div>',
+        unsafe_allow_html=True,
     )
 
 
